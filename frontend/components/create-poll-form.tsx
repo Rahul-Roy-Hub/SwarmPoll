@@ -1,0 +1,226 @@
+"use client"
+
+import type React from "react"
+
+import { useState } from "react"
+import { useWriteContract } from "wagmi"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
+import { Badge } from "@/components/ui/badge"
+import { Loader2, Plus, X, Calendar, HelpCircle } from "lucide-react"
+import { SWARMPOLL_CONTRACT_ADDRESS, SWARMPOLL_ABI } from "@/lib/constants"
+import { useToast } from "@/hooks/use-toast"
+
+export function CreatePollForm() {
+  const [question, setQuestion] = useState("")
+  const [options, setOptions] = useState(["", ""])
+  const [endDate, setEndDate] = useState("")
+  const [endTime, setEndTime] = useState("")
+  const [isCreating, setIsCreating] = useState(false)
+  const { writeContract } = useWriteContract()
+  const { toast } = useToast()
+
+  const addOption = () => {
+    if (options.length < 10) {
+      setOptions([...options, ""])
+    }
+  }
+
+  const removeOption = (index: number) => {
+    if (options.length > 2) {
+      setOptions(options.filter((_, i) => i !== index))
+    }
+  }
+
+  const updateOption = (index: number, value: string) => {
+    const newOptions = [...options]
+    newOptions[index] = value
+    setOptions(newOptions)
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+
+    // Validation
+    if (!question.trim()) {
+      toast({
+        title: "Question required",
+        description: "Please enter a poll question",
+        variant: "destructive",
+      })
+      return
+    }
+
+    const validOptions = options.filter((opt) => opt.trim())
+    if (validOptions.length < 2) {
+      toast({
+        title: "Insufficient options",
+        description: "Please provide at least 2 options",
+        variant: "destructive",
+      })
+      return
+    }
+
+    if (!endDate || !endTime) {
+      toast({
+        title: "End time required",
+        description: "Please set when the poll should end",
+        variant: "destructive",
+      })
+      return
+    }
+
+    const endDateTime = new Date(`${endDate}T${endTime}`)
+    if (endDateTime <= new Date()) {
+      toast({
+        title: "Invalid end time",
+        description: "End time must be in the future",
+        variant: "destructive",
+      })
+      return
+    }
+
+    const endTimeUnix = Math.floor(endDateTime.getTime() / 1000)
+
+    setIsCreating(true)
+    try {
+      await writeContract({
+        address: SWARMPOLL_CONTRACT_ADDRESS,
+        abi: SWARMPOLL_ABI,
+        functionName: "createPoll",
+        args: [question.trim(), validOptions, BigInt(endTimeUnix)],
+      })
+
+      toast({
+        title: "Poll creation submitted",
+        description: "Your poll is being created on the blockchain",
+      })
+
+      // Reset form
+      setQuestion("")
+      setOptions(["", ""])
+      setEndDate("")
+      setEndTime("")
+    } catch (error) {
+      toast({
+        title: "Poll creation failed",
+        description: "Please try again",
+        variant: "destructive",
+      })
+    } finally {
+      setIsCreating(false)
+    }
+  }
+
+  const getMinDateTime = () => {
+    const now = new Date()
+    now.setMinutes(now.getMinutes() + 30) // Minimum 30 minutes from now
+    return now.toISOString().slice(0, 16)
+  }
+
+  return (
+    <Card className="max-w-2xl mx-auto">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <HelpCircle className="w-5 h-5" />
+          Create New Poll
+        </CardTitle>
+      </CardHeader>
+
+      <CardContent>
+        <form onSubmit={handleSubmit} className="space-y-6">
+          {/* Question */}
+          <div className="space-y-2">
+            <Label htmlFor="question">Poll Question</Label>
+            <Textarea
+              id="question"
+              placeholder="What question do you want to ask the crowd?"
+              value={question}
+              onChange={(e) => setQuestion(e.target.value)}
+              rows={3}
+              maxLength={500}
+            />
+            <p className="text-xs text-muted-foreground">{question.length}/500 characters</p>
+          </div>
+
+          {/* Options */}
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <Label>Answer Options</Label>
+              <Badge variant="secondary">{options.filter((opt) => opt.trim()).length} options</Badge>
+            </div>
+
+            <div className="space-y-3">
+              {options.map((option, index) => (
+                <div key={index} className="flex gap-2">
+                  <Input
+                    placeholder={`Option ${index + 1}`}
+                    value={option}
+                    onChange={(e) => updateOption(index, e.target.value)}
+                    maxLength={200}
+                  />
+                  {options.length > 2 && (
+                    <Button type="button" variant="outline" size="icon" onClick={() => removeOption(index)}>
+                      <X className="w-4 h-4" />
+                    </Button>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            {options.length < 10 && (
+              <Button type="button" variant="outline" onClick={addOption} className="w-full bg-transparent">
+                <Plus className="w-4 h-4 mr-2" />
+                Add Option
+              </Button>
+            )}
+          </div>
+
+          {/* End Time */}
+          <div className="space-y-4">
+            <Label className="flex items-center gap-2">
+              <Calendar className="w-4 h-4" />
+              Poll End Time
+            </Label>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="endDate" className="text-sm">
+                  Date
+                </Label>
+                <Input
+                  id="endDate"
+                  type="date"
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                  min={new Date().toISOString().split("T")[0]}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="endTime" className="text-sm">
+                  Time
+                </Label>
+                <Input id="endTime" type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} />
+              </div>
+            </div>
+
+            {endDate && endTime && (
+              <p className="text-sm text-muted-foreground">
+                Poll will end: {new Date(`${endDate}T${endTime}`).toLocaleString()}
+              </p>
+            )}
+          </div>
+
+          {/* Submit */}
+          <Button type="submit" disabled={isCreating} className="w-full" size="lg">
+            {isCreating && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+            Create Poll
+          </Button>
+        </form>
+      </CardContent>
+    </Card>
+  )
+}
