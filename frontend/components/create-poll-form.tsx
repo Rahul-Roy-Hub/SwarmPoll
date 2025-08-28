@@ -10,12 +10,14 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
-import { Loader2, Plus, X, Calendar, HelpCircle } from "lucide-react"
+import { Loader2, Plus, X, Calendar, HelpCircle, MessageSquare, Info, Users, Target, Crown } from "lucide-react"
 import { SWARMPOLL_CONTRACT_ADDRESS, SWARMPOLL_ABI } from "@/lib/constants"
 import { useToast } from "@/hooks/use-toast"
 
 export function CreatePollForm() {
   const [question, setQuestion] = useState("")
+  const [description, setDescription] = useState("")
+  const [background, setBackground] = useState("")
   const [options, setOptions] = useState(["", ""])
   const [endDate, setEndDate] = useState("")
   const [endTime, setEndTime] = useState("")
@@ -101,6 +103,8 @@ export function CreatePollForm() {
 
       // Reset form
       setQuestion("")
+      setDescription("")
+      setBackground("")
       setOptions(["", ""])
       setEndDate("")
       setEndTime("")
@@ -122,45 +126,98 @@ export function CreatePollForm() {
   }
 
   return (
-    <Card className="max-w-2xl mx-auto">
+    <Card className="max-w-3xl mx-auto">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          <HelpCircle className="w-5 h-5" />
-          Create New Poll
+          <Crown className="w-5 h-5 text-primary" />
+          Create New Poll (Admin Only)
         </CardTitle>
+        <p className="text-sm text-muted-foreground">
+          Create engaging polls that will capture the community's interest and drive participation.
+        </p>
       </CardHeader>
 
       <CardContent>
-        <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Question */}
-          <div className="space-y-2">
-            <Label htmlFor="question">Poll Question</Label>
-            <Textarea
-              id="question"
-              placeholder="What question do you want to ask the crowd?"
-              value={question}
-              onChange={(e) => setQuestion(e.target.value)}
-              rows={3}
-              maxLength={500}
-            />
-            <p className="text-xs text-muted-foreground">{question.length}/500 characters</p>
+        <form onSubmit={handleSubmit} className="space-y-8">
+          {/* Question Section */}
+          <div className="space-y-4">
+            <div className="flex items-center gap-2">
+              <HelpCircle className="w-5 h-5 text-primary" />
+              <Label className="text-lg font-semibold">Poll Question</Label>
+            </div>
+            <div className="space-y-2">
+              <Textarea
+                id="question"
+                placeholder="What question do you want to ask the crowd? Make it engaging and clear."
+                value={question}
+                onChange={(e) => setQuestion(e.target.value)}
+                rows={3}
+                maxLength={500}
+                className="text-lg"
+              />
+              <p className="text-xs text-muted-foreground">{question.length}/500 characters</p>
+            </div>
           </div>
 
-          {/* Options */}
+          {/* Description Section */}
+          <div className="space-y-4">
+            <div className="flex items-center gap-2">
+              <MessageSquare className="w-5 h-5 text-primary" />
+              <Label className="text-lg font-semibold">Poll Description</Label>
+            </div>
+            <div className="space-y-2">
+              <Textarea
+                id="description"
+                placeholder="Provide additional context or explanation for the poll question..."
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                rows={2}
+                maxLength={300}
+              />
+              <p className="text-xs text-muted-foreground">{description.length}/300 characters</p>
+            </div>
+          </div>
+
+          {/* Background Context */}
+          <div className="space-y-4">
+            <div className="flex items-center gap-2">
+              <Info className="w-5 h-5 text-primary" />
+              <Label className="text-lg font-semibold">Background Context</Label>
+            </div>
+            <div className="space-y-2">
+              <Textarea
+                id="background"
+                placeholder="Add any relevant background information, context, or why this poll matters..."
+                value={background}
+                onChange={(e) => setBackground(e.target.value)}
+                rows={3}
+                maxLength={500}
+              />
+              <p className="text-xs text-muted-foreground">{background.length}/500 characters</p>
+            </div>
+          </div>
+
+          {/* Options Section */}
           <div className="space-y-4">
             <div className="flex items-center justify-between">
-              <Label>Answer Options</Label>
-              <Badge variant="secondary">{options.filter((opt) => opt.trim()).length} options</Badge>
+              <div className="flex items-center gap-2">
+                <Target className="w-5 h-5 text-primary" />
+                <Label className="text-lg font-semibold">Answer Options</Label>
+              </div>
+              <Badge variant="secondary" className="px-3 py-1">
+                {options.filter((opt) => opt.trim()).length} options
+              </Badge>
             </div>
 
             <div className="space-y-3">
               {options.map((option, index) => (
                 <div key={index} className="flex gap-2">
                   <Input
-                    placeholder={`Option ${index + 1}`}
+                    placeholder={`Option ${index + 1} - Be specific and clear`}
                     value={option}
                     onChange={(e) => updateOption(index, e.target.value)}
                     maxLength={200}
+                    className="text-base"
                   />
                   {options.length > 2 && (
                     <Button type="button" variant="outline" size="icon" onClick={() => removeOption(index)}>
@@ -172,17 +229,17 @@ export function CreatePollForm() {
             </div>
 
             {options.length < 10 && (
-              <Button type="button" variant="outline" onClick={addOption} className="w-full bg-transparent">
+              <Button type="button" variant="outline" onClick={addOption} className="w-full bg-transparent border-dashed">
                 <Plus className="w-4 h-4 mr-2" />
                 Add Option
               </Button>
             )}
           </div>
 
-          {/* End Time */}
+          {/* End Time Section */}
           <div className="space-y-4">
-            <Label className="flex items-center gap-2">
-              <Calendar className="w-4 h-4" />
+            <Label className="flex items-center gap-2 text-lg font-semibold">
+              <Calendar className="w-4 h-4 text-primary" />
               Poll End Time
             </Label>
 
@@ -214,9 +271,10 @@ export function CreatePollForm() {
             )}
           </div>
 
-          {/* Submit */}
-          <Button type="submit" disabled={isCreating} className="w-full" size="lg">
+          {/* Submit Button */}
+          <Button type="submit" disabled={isCreating} className="w-full py-6 text-lg font-semibold" size="lg">
             {isCreating && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+            <Crown className="w-5 h-5 mr-2" />
             Create Poll
           </Button>
         </form>
