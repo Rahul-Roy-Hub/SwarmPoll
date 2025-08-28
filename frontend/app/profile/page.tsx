@@ -8,14 +8,75 @@ import { StakeHistoryItem } from "@/components/stake-history-item"
 import { UserStats } from "@/components/user-stats"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Textarea } from "@/components/ui/textarea"
+import { Label } from "@/components/ui/label"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Skeleton } from "@/components/ui/skeleton"
 import { ConnectButton } from "@rainbow-me/rainbowkit"
 import { Wallet, Trophy, History, TrendingUp, AlertCircle } from "lucide-react"
-import { useMemo } from "react"
+import { useEffect, useMemo, useState } from "react"
 
 export default function ProfilePage() {
   const { address, isConnected } = useAccount()
+
+  type LocalProfile = {
+    displayName: string
+    bio: string
+    avatarUrl: string
+  }
+
+  const [profile, setProfile] = useState<LocalProfile>({
+    displayName: "",
+    bio: "",
+    avatarUrl: "/placeholder-user.jpg",
+  })
+  const [isSaving, setIsSaving] = useState(false)
+
+  // Load profile from localStorage when wallet connects/changes
+  useEffect(() => {
+    if (!address) return
+    try {
+      const raw = localStorage.getItem(`sp_profile_${address}`)
+      if (raw) {
+        const parsed = JSON.parse(raw) as LocalProfile
+        setProfile({
+          displayName: parsed.displayName || "",
+          bio: parsed.bio || "",
+          avatarUrl: parsed.avatarUrl || "/placeholder-user.jpg",
+        })
+      } else {
+        setProfile((prev) => ({ ...prev, displayName: "", bio: "" }))
+      }
+    } catch {
+      // ignore malformed data
+    }
+  }, [address])
+
+  const handleSaveProfile = () => {
+    if (!address) return
+    setIsSaving(true)
+    try {
+      localStorage.setItem(`sp_profile_${address}`, JSON.stringify(profile))
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      const result = e.target?.result as string
+      if (result) {
+        setProfile((p) => ({ ...p, avatarUrl: result }))
+      }
+    }
+    reader.readAsDataURL(file)
+  }
 
   const {
     data: stakesData,
@@ -116,38 +177,7 @@ export default function ProfilePage() {
     )
   }
 
-  if (stakesLoading) {
-    return (
-      <div className="space-y-6">
-        <div className="space-y-4">
-          <Skeleton className="h-8 w-48" />
-          <Skeleton className="h-4 w-96" />
-        </div>
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {[...Array(5)].map((_, i) => (
-            <Skeleton key={i} className="h-24" />
-          ))}
-        </div>
-        <div className="space-y-4">
-          {[...Array(3)].map((_, i) => (
-            <Skeleton key={i} className="h-32" />
-          ))}
-        </div>
-      </div>
-    )
-  }
-
-  if (stakesError) {
-    return (
-      <div className="space-y-6">
-        <h1 className="text-3xl font-bold">Your Profile</h1>
-        <Alert variant="destructive">
-          <AlertCircle className="h-4 w-4" />
-          <AlertDescription>Failed to load your profile data. Please try again.</AlertDescription>
-        </Alert>
-      </div>
-    )
-  }
+  const isLoading = stakesLoading
 
   const stakes = stakesData?.stakes || []
   const claimableStakes = stakes.filter(
@@ -165,11 +195,78 @@ export default function ProfilePage() {
         <p className="text-muted-foreground">Track your SwarmPoll performance and claim your winnings</p>
       </div>
 
+      {/* Data load error (non-blocking) */}
+      {stakesError && (
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>Failed to load your on-chain activity. Profile editing still works.</AlertDescription>
+        </Alert>
+      )}
+
+      {/* Profile Settings (always visible when connected) */}
+      <Card>
+        <CardContent className="pt-6">
+          <div className="grid gap-6 md:grid-cols-[144px_1fr] items-start">
+            <div className="flex flex-col items-center gap-3">
+              <Avatar className="h-24 w-24">
+                <AvatarImage src={profile.avatarUrl} alt="avatar" />
+                <AvatarFallback>
+                  {address ? `${address.slice(2, 4)}${address.slice(-2)}`.toUpperCase() : "SP"}
+                </AvatarFallback>
+              </Avatar>
+              <div className="w-full">
+                <Label htmlFor="avatarFile">Upload Avatar</Label>
+                <Input
+                  id="avatarFile"
+                  type="file"
+                  accept="image/*"
+                  onChange={handleImageUpload}
+                  className="text-xs"
+                />
+              </div>
+            </div>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="displayName">Display name</Label>
+                <Input
+                  id="displayName"
+                  placeholder={address || "Your name"}
+                  value={profile.displayName}
+                  onChange={(e) => setProfile((p) => ({ ...p, displayName: e.target.value }))}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="bio">Bio</Label>
+                <Textarea
+                  id="bio"
+                  placeholder="Tell others about you"
+                  value={profile.bio}
+                  onChange={(e) => setProfile((p) => ({ ...p, bio: e.target.value }))}
+                />
+              </div>
+              <div className="flex gap-3">
+                <Button onClick={handleSaveProfile} disabled={!address || isSaving}>
+                  {isSaving ? "Saving..." : "Save profile"}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Stats */}
-      <UserStats {...userStats} />
+      {isLoading ? (
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {[...Array(5)].map((_, i) => (
+            <Skeleton key={i} className="h-24" />
+          ))}
+        </div>
+      ) : (
+        <UserStats {...userStats} />
+      )}
 
       {/* Claimable Rewards */}
-      {claimableStakes.length > 0 && (
+      {!isLoading && claimableStakes.length > 0 && (
         <div className="space-y-4">
           <div className="flex items-center gap-2">
             <Trophy className="w-5 h-5 text-green-500" />
@@ -198,7 +295,13 @@ export default function ProfilePage() {
           <h2 className="text-xl font-semibold">Your Stakes</h2>
         </div>
 
-        {stakes.length === 0 ? (
+        {isLoading ? (
+          <div className="space-y-4">
+            {[...Array(3)].map((_, i) => (
+              <Skeleton key={i} className="h-32" />
+            ))}
+          </div>
+        ) : stakes.length === 0 ? (
           <Card className="text-center py-12">
             <CardContent>
               <TrendingUp className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
