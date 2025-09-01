@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { MessageSquare, ThumbsUp, Clock, User } from "lucide-react"
 import { useAccount } from "wagmi"
+import Image from "next/image"
 
 interface Discussion {
   id: number
@@ -62,7 +63,16 @@ export function DiscussionBoard() {
     return (
       <Card className="text-center py-12">
         <CardContent>
-          <MessageSquare className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+          <div className="flex items-center justify-center gap-3 mb-4">
+            <Image 
+              src="/swarmpoll-logo.png" 
+              alt="SwarmPoll Logo" 
+              width={48} 
+              height={48} 
+              className="w-12 h-12"
+            />
+            <MessageSquare className="h-12 w-12 text-muted-foreground" />
+          </div>
           <h3 className="text-lg font-semibold mb-2">No Suggestions Yet</h3>
           <p className="text-muted-foreground">
             Be the first to suggest a new poll topic! Your idea could become the next big prediction market.

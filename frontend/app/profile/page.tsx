@@ -159,14 +159,14 @@ export default function ProfilePage() {
     return (
       <div className="space-y-6">
         <div className="text-center space-y-4">
-          <h1 className="text-3xl font-bold">Your Profile</h1>
+          <h1 className="text-3xl font-bold bg-gradient-to-r from-purple-600 to-purple-700 bg-clip-text text-transparent">Your Profile</h1>
           <p className="text-muted-foreground">Connect your wallet to view your SwarmPoll activity</p>
         </div>
 
-        <Card className="text-center py-12">
+        <Card className="text-center py-12 bg-gradient-to-br from-purple-500/5 to-purple-600/5 border border-purple-500/20">
           <CardContent>
-            <Wallet className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-            <h3 className="text-lg font-semibold mb-4">Connect Your Wallet</h3>
+            <Wallet className="h-12 w-12 mx-auto text-purple-600 mb-4" />
+            <h3 className="text-lg font-semibold mb-4 text-purple-700 dark:text-purple-400">Connect Your Wallet</h3>
             <p className="text-muted-foreground mb-6">
               View your stake history, claimable rewards, and performance statistics
             </p>
@@ -191,7 +191,7 @@ export default function ProfilePage() {
     <div className="space-y-8">
       {/* Header */}
       <div className="space-y-2">
-        <h1 className="text-3xl font-bold">Your Profile</h1>
+        <h1 className="text-3xl font-bold bg-gradient-to-r from-purple-600 to-purple-700 bg-clip-text text-transparent">Your Profile</h1>
         <p className="text-muted-foreground">Track your SwarmPoll performance and claim your winnings</p>
       </div>
 
@@ -204,48 +204,50 @@ export default function ProfilePage() {
       )}
 
       {/* Profile Settings (always visible when connected) */}
-      <Card>
+      <Card className="bg-gradient-to-br from-purple-500/5 to-purple-600/5 border border-purple-500/20">
         <CardContent className="pt-6">
           <div className="grid gap-6 md:grid-cols-[144px_1fr] items-start">
             <div className="flex flex-col items-center gap-3">
-              <Avatar className="h-24 w-24">
+              <Avatar className="h-24 w-24 ring-2 ring-purple-500/30">
                 <AvatarImage src={profile.avatarUrl} alt="avatar" />
-                <AvatarFallback>
+                <AvatarFallback className="bg-purple-500/20 text-purple-700 dark:text-purple-400">
                   {address ? `${address.slice(2, 4)}${address.slice(-2)}`.toUpperCase() : "SP"}
                 </AvatarFallback>
               </Avatar>
               <div className="w-full">
-                <Label htmlFor="avatarFile">Upload Avatar</Label>
+                <Label htmlFor="avatarFile" className="text-purple-700 dark:text-purple-400">Upload Avatar</Label>
                 <Input
                   id="avatarFile"
                   type="file"
                   accept="image/*"
                   onChange={handleImageUpload}
-                  className="text-xs"
+                  className="text-xs border-purple-500/30 focus:border-purple-500"
                 />
               </div>
             </div>
             <div className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="displayName">Display name</Label>
+                <Label htmlFor="displayName" className="text-purple-700 dark:text-purple-400">Display name</Label>
                 <Input
                   id="displayName"
                   placeholder={address || "Your name"}
                   value={profile.displayName}
                   onChange={(e) => setProfile((p) => ({ ...p, displayName: e.target.value }))}
+                  className="border-purple-500/30 focus:border-purple-500"
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="bio">Bio</Label>
+                <Label htmlFor="bio" className="text-purple-700 dark:text-purple-400">Bio</Label>
                 <Textarea
                   id="bio"
                   placeholder="Tell others about you"
                   value={profile.bio}
                   onChange={(e) => setProfile((p) => ({ ...p, bio: e.target.value }))}
+                  className="border-purple-500/30 focus:border-purple-500"
                 />
               </div>
               <div className="flex gap-3">
-                <Button onClick={handleSaveProfile} disabled={!address || isSaving}>
+                <Button onClick={handleSaveProfile} disabled={!address || isSaving} className="bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700">
                   {isSaving ? "Saving..." : "Save profile"}
                 </Button>
               </div>
@@ -269,8 +271,8 @@ export default function ProfilePage() {
       {!isLoading && claimableStakes.length > 0 && (
         <div className="space-y-4">
           <div className="flex items-center gap-2">
-            <Trophy className="w-5 h-5 text-green-500" />
-            <h2 className="text-xl font-semibold">Claimable Rewards</h2>
+            <Trophy className="w-5 h-5 text-emerald-600" />
+            <h2 className="text-xl font-semibold text-emerald-700 dark:text-emerald-400">Claimable Rewards</h2>
           </div>
           <div className="grid gap-4 md:grid-cols-2">
             {claimableStakes.map((stake: any) => (
@@ -291,8 +293,8 @@ export default function ProfilePage() {
       {/* Stake History */}
       <div className="space-y-4">
         <div className="flex items-center gap-2">
-          <History className="w-5 h-5 text-primary" />
-          <h2 className="text-xl font-semibold">Your Stakes</h2>
+          <History className="w-5 h-5 text-purple-600" />
+          <h2 className="text-xl font-semibold text-purple-700 dark:text-purple-400">Your Stakes</h2>
         </div>
 
         {isLoading ? (
@@ -302,12 +304,12 @@ export default function ProfilePage() {
             ))}
           </div>
         ) : stakes.length === 0 ? (
-          <Card className="text-center py-12">
+          <Card className="text-center py-12 bg-gradient-to-br from-purple-500/5 to-purple-600/5 border border-purple-500/20">
             <CardContent>
-              <TrendingUp className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-              <h3 className="text-lg font-semibold mb-2">No Stakes Yet</h3>
+              <TrendingUp className="h-12 w-12 mx-auto text-purple-600 mb-4" />
+              <h3 className="text-lg font-semibold mb-2 text-purple-700 dark:text-purple-400">No Stakes Yet</h3>
               <p className="text-muted-foreground mb-6">Start participating in polls to see your activity here</p>
-              <Button asChild>
+              <Button asChild className="bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700">
                 <a href="/">Browse Active Polls</a>
               </Button>
             </CardContent>

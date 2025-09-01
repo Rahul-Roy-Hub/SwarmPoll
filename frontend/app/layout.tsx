@@ -9,8 +9,20 @@ import { Navbar } from "@/components/navbar"
 
 export const metadata: Metadata = {
   title: "SwarmPoll - Social Prediction Game",
-  description: "Predict what others will choose and win rewards",
+  description: "Predict what others will choose and win rewards from the collective wisdom",
   generator: "v0.app",
+  icons: {
+    icon: "/swarmpoll-logo.png",
+    apple: "/swarmpoll-logo.png",
+  },
+  keywords: ["prediction markets", "social prediction", "blockchain", "staking", "rewards", "crowd wisdom"],
+  authors: [{ name: "SwarmPoll Team" }],
+  openGraph: {
+    title: "SwarmPoll - Social Prediction Game",
+    description: "Predict what others will choose and win rewards from the collective wisdom",
+    type: "website",
+    images: ["/swarmpoll-logo.png"],
+  },
 }
 
 export default function RootLayout({
@@ -19,12 +31,12 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en">
-      <body className={`font-sans ${GeistSans.variable} ${GeistMono.variable}`}>
+    <html lang="en" className="scroll-smooth">
+      <body className={`font-sans ${GeistSans.variable} ${GeistMono.variable} antialiased`}>
         <Providers>
           <div className="min-h-screen bg-background">
             <Navbar />
-            <main className="container mx-auto px-4 py-8">{children}</main>
+            <main className="relative">{children}</main>
           </div>
         </Providers>
       </body>

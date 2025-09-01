@@ -6,6 +6,7 @@ import { PollCard } from "./poll-card"
 import { Card, CardContent } from "@/components/ui/card"
 import { AlertCircle, TrendingUp } from "lucide-react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import Image from "next/image"
 
 type ActivePollsData = { polls: any[] }
 
@@ -52,7 +53,16 @@ export function PollsList() {
     return (
       <Card className="text-center py-12">
         <CardContent>
-          <TrendingUp className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+          <div className="flex items-center justify-center gap-3 mb-4">
+            <Image 
+              src="/swarmpoll-logo.png" 
+              alt="SwarmPoll Logo" 
+              width={48} 
+              height={48} 
+              className="w-12 h-12"
+            />
+            <TrendingUp className="h-12 w-12 text-muted-foreground" />
+          </div>
           <h3 className="text-lg font-semibold mb-2">No Active Polls</h3>
           <p className="text-muted-foreground">
             There are no active polls at the moment. Check back later or create a new poll!
