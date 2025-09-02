@@ -1,218 +1,284 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.19;
+pragma solidity ^0.8.24;
 
-import "@openzeppelin/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import {SwarmToken} from "./SwarmToken.sol";
 
 /**
  * @title SwarmPoll
- * @dev A social prediction game where players bet on what they think the crowd will choose
+ * @notice Permissioned poll system where each address can participate once per poll.
+ *          Users stakes USDC to enter a poll (stake amount affects rewards but NOT vote weight).
+ *          Vote weight = 1 per address (one participation per poll).
+ *          Baseline SWM minted on participation (proportional to stake).
+ *          Bonuhgs SWM minted to winners (proportional to their USDC reward).
+ *          Winners receive USDC rewards proportional to their stake among winning-option stakers.
+ *          A treasury cut (TREASURY_FEE_BPS) is taken from stakes and accumulated.
+ *
  */
 contract SwarmPoll is Ownable, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
-    IERC20 public immutable usdcToken;
-    
+    ////////////////////////////////////////////////////////////////
+    //                    ERRORS                                  //
+    ////////////////////////////////////////////////////////////////
+    error SwarmPoll__InvalidPollId();
+    error SwarmPoll__NotEnoughOptions(uint256);
+    error SwarmPoll__PollNotActive();
+    error SwarmPoll__PollAlreadyEnded();
+    error SwarmPoll__InvalidOption(uint256 optionId);
+    error SwarmPoll__NoStakePlaced();
+    error SwarmPoll__NoWinnings();
+    error SwarmPoll__AlreadyClaimed();
+    error SwarmPoll__DurationMustBePositive();
+    error SwarmPoll__AlreadyParticipated();
+    error SwarmPoll__ZeroAddress();
+
+    ////////////////////////////////////////////////////////////////
+    //                    EVENTS                                  //
+    ////////////////////////////////////////////////////////////////
+    event PollCreated(uint256 indexed pollId, string question, string[] options, uint256 duration);
+    event EnteredPoll(
+        uint256 indexed pollId, address indexed user, uint256 optionId, uint256 amount, uint256 fee, uint256 swmMinted
+    );
+    event PollEnded(uint256 indexed pollId, uint256 winningOption);
+    event ClaimedReward(uint256 indexed pollId, address indexed user, uint256 amount, uint256 bonusSwm);
+    event SwmMinted(uint256 amount, address to);
+
+    ////////////////////////////////////////////////////////////////
+    //                    STRUCTS                                 //
+    ////////////////////////////////////////////////////////////////
     struct Poll {
         string question;
         string[] options;
         uint256 endTime;
-        uint256 totalStaked;
-        bool ended;
-        uint256 winningOption;
-        mapping(uint256 => uint256) optionStakes; // optionId => total staked
-        mapping(address => mapping(uint256 => uint256)) userStakes; // user => optionId => amount
-        mapping(address => bool) hasClaimed;
+        bool active;
+        uint256 totalStaked; // USDC (6 decimals)
+        uint256 winningOptionId;
+        bool winnerDeclared;
+        mapping(uint256 => uint256) optionStakes; // optionId → total USDC staked
+        mapping(address => mapping(uint256 => uint256)) userStakes; // user → optionId → stake (USDC)
+        mapping(address => bool) claimed; // user → claimed status
+        mapping(address => bool) hasEntered; // user → already entered?
     }
-    
-    Poll[] public polls;
-    
-    event PollCreated(uint256 indexed pollId, string question, string[] options, uint256 endTime);
-    event Staked(uint256 indexed pollId, address indexed user, uint256 optionId, uint256 amount);
-    event WinnerDeclared(uint256 indexed pollId, uint256 winningOption);
-    event RewardClaimed(uint256 indexed pollId, address indexed user, uint256 amount);
-    
-    constructor(address _usdcToken) {
+
+    ////////////////////////////////////////////////////////////////
+    //                    STATE VARIABLES                         //
+    ////////////////////////////////////////////////////////////////
+    IERC20 public immutable usdcToken;
+    SwarmToken public immutable swarmToken;
+
+    address public immutable treasury;
+
+    uint256 public constant TREASURY_FEE_BPS = 200; // 2%
+    uint256 public constant BASELINE_SWM_PER_USDC = 1e17; // 0.1 SWM per USDC
+    uint256 public constant BONUS_SWM_PER_USDC = 1e18; // 1 SWM per USDC reward
+
+    uint256 public totalFeesCollected;
+    uint256 public lastMintTimestamp;
+
+    uint256 public pollCount;
+    mapping(uint256 => Poll) private polls;
+
+    ////////////////////////////////////////////////////////////////
+    //                    CONSTRUCTOR                             //
+    ////////////////////////////////////////////////////////////////
+    constructor(address _usdcToken, address _swarmToken) Ownable(msg.sender) {
+        if (_usdcToken == address(0) || _swarmToken == address(0)) {
+            revert SwarmPoll__ZeroAddress();
+        }
+
         usdcToken = IERC20(_usdcToken);
+        swarmToken = SwarmToken(_swarmToken);
+        treasury = address(this);
     }
-    
-    /**
-     * @dev Create a new poll
-     * @param _question The poll question
-     * @param _options Array of possible answers
-     * @param _duration Duration in seconds from now
-     */
-    function createPoll(
-        string memory _question,
-        string[] memory _options,
-        uint256 _duration
-    ) external onlyOwner {
-        require(_options.length >= 2, "Must have at least 2 options");
-        require(_duration > 0, "Duration must be positive");
-        
-        Poll storage newPoll = polls.push();
+
+    ////////////////////////////////////////////////////////////////
+    //                    POLL MANAGEMENT                         //
+    ////////////////////////////////////////////////////////////////
+    function createPoll(string memory _question, string[] memory _options, uint256 _duration) external onlyOwner {
+        if (_duration == 0) revert SwarmPoll__DurationMustBePositive();
+        if (_options.length < 2) revert SwarmPoll__NotEnoughOptions(_options.length);
+
+        uint256 pollId = pollCount++;
+        Poll storage newPoll = polls[pollId];
         newPoll.question = _question;
         newPoll.options = _options;
         newPoll.endTime = block.timestamp + _duration;
-        newPoll.ended = false;
-        
-        emit PollCreated(polls.length - 1, _question, _options, newPoll.endTime);
+        newPoll.active = true;
+
+        emit PollCreated(pollId, _question, _options, _duration);
     }
-    
-    /**
-     * @dev Stake USDC on an option
-     * @param _pollId The poll ID
-     * @param _optionId The option to stake on (0-indexed)
-     * @param _amount Amount of USDC to stake
-     */
+
+    ////////////////////////////////////////////////////////////////
+    //                    STAKING                                  //
+    ////////////////////////////////////////////////////////////////
     function stake(uint256 _pollId, uint256 _optionId, uint256 _amount) external nonReentrant {
-        require(_pollId < polls.length, "Invalid poll ID");
-        Poll storage poll = polls[_pollId];
-        require(!poll.ended, "Poll has ended");
-        require(block.timestamp < poll.endTime, "Poll has expired");
-        require(_optionId < poll.options.length, "Invalid option");
-        require(_amount > 0, "Amount must be positive");
-        
-        // Transfer USDC from user to contract
-        usdcToken.safeTransferFrom(msg.sender, address(this), _amount);
-        
-        // Update stakes
-        poll.totalStaked += _amount;
-        poll.optionStakes[_optionId] += _amount;
-        poll.userStakes[msg.sender][_optionId] += _amount;
-        
-        emit Staked(_pollId, msg.sender, _optionId, _amount);
+        _stake(_pollId, _optionId, _amount);
     }
-    
-    /**
-     * @dev Declare the winner of a poll (admin only)
-     * @param _pollId The poll ID
-     * @param _winningOptionId The winning option ID
-     */
+
+    function _stake(uint256 _pollId, uint256 _optionId, uint256 _amount) internal {
+        if (_pollId >= pollCount) revert SwarmPoll__InvalidPollId();
+        if (_amount == 0) revert SwarmPoll__NoStakePlaced();
+
+        Poll storage poll = polls[_pollId];
+        if (!poll.active || block.timestamp >= poll.endTime) revert SwarmPoll__PollNotActive();
+        if (_optionId >= poll.options.length) revert SwarmPoll__InvalidOption(_optionId);
+        if (poll.hasEntered[msg.sender]) revert SwarmPoll__AlreadyParticipated();
+
+        poll.hasEntered[msg.sender] = true;
+
+        uint256 fee = (_amount * TREASURY_FEE_BPS) / 10000;
+        uint256 netAmount = _amount - fee;
+
+        totalFeesCollected += fee;
+        poll.totalStaked += netAmount;
+        poll.optionStakes[_optionId] += netAmount;
+        poll.userStakes[msg.sender][_optionId] = netAmount;
+
+        usdcToken.safeTransferFrom(msg.sender, treasury, fee);
+        usdcToken.safeTransferFrom(msg.sender, address(this), netAmount);
+
+        uint256 swmToMint = (netAmount * BASELINE_SWM_PER_USDC) / 1e6;
+        if (swmToMint > 0) {
+            bool ok = swarmToken.mint(msg.sender, swmToMint);
+            require(ok, "SWM mint failed");
+            emit SwmMinted(swmToMint, msg.sender);
+        }
+
+        emit EnteredPoll(_pollId, msg.sender, _optionId, netAmount, fee, swmToMint);
+    }
+
+    ////////////////////////////////////////////////////////////////
+    //                  DECLARE WINNER                            //
+    ////////////////////////////////////////////////////////////////
     function declareWinner(uint256 _pollId, uint256 _winningOptionId) external onlyOwner {
-        require(_pollId < polls.length, "Invalid poll ID");
+        if (_pollId >= pollCount) revert SwarmPoll__InvalidPollId();
+
         Poll storage poll = polls[_pollId];
-        require(!poll.ended, "Poll already ended");
-        require(block.timestamp >= poll.endTime, "Poll not yet expired");
-        require(_winningOptionId < poll.options.length, "Invalid option");
-        
-        poll.ended = true;
-        poll.winningOption = _winningOptionId;
-        
-        emit WinnerDeclared(_pollId, _winningOptionId);
+        if (block.timestamp < poll.endTime) revert SwarmPoll__PollNotActive();
+        if (!poll.active) revert SwarmPoll__PollAlreadyEnded();
+        if (_winningOptionId >= poll.options.length) revert SwarmPoll__InvalidOption(_winningOptionId);
+
+        poll.winnerDeclared = true;
+        poll.winningOptionId = _winningOptionId;
+        poll.active = false;
+
+        emit PollEnded(_pollId, _winningOptionId);
     }
-    
-    /**
-     * @dev Claim rewards for winning stakes
-     * @param _pollId The poll ID
-     */
+
+    ////////////////////////////////////////////////////////////////
+    //                   CLAIMING REWARDS                         //
+    ////////////////////////////////////////////////////////////////
     function claimReward(uint256 _pollId) external nonReentrant {
-        require(_pollId < polls.length, "Invalid poll ID");
+        if (_pollId >= pollCount) revert SwarmPoll__InvalidPollId();
+
         Poll storage poll = polls[_pollId];
-        require(poll.ended, "Poll not ended");
-        require(!poll.hasClaimed[msg.sender], "Already claimed");
-        
-        uint256 userStake = poll.userStakes[msg.sender][poll.winningOption];
-        require(userStake > 0, "No winning stake");
-        
-        // Calculate reward
-        uint256 totalWinningStakes = poll.optionStakes[poll.winningOption];
-        uint256 totalLosingStakes = poll.totalStaked - totalWinningStakes;
-        uint256 reward = (userStake * totalLosingStakes) / totalWinningStakes + userStake;
-        
-        poll.hasClaimed[msg.sender] = true;
-        
-        // Transfer reward
+        if (!poll.winnerDeclared) revert SwarmPoll__PollNotActive();
+        if (poll.claimed[msg.sender]) revert SwarmPoll__AlreadyClaimed();
+
+        uint256 stakeAmount = poll.userStakes[msg.sender][poll.winningOptionId];
+        if (stakeAmount == 0) revert SwarmPoll__NoStakePlaced();
+
+        uint256 winnerTotal = poll.optionStakes[poll.winningOptionId];
+        uint256 reward = (stakeAmount * poll.totalStaked) / winnerTotal;
+        if (reward == 0) revert SwarmPoll__NoWinnings();
+
+        poll.claimed[msg.sender] = true;
+
         usdcToken.safeTransfer(msg.sender, reward);
-        
-        emit RewardClaimed(_pollId, msg.sender, reward);
+
+        uint256 bonusSwm = (reward * BONUS_SWM_PER_USDC) / 1e6;
+        if (bonusSwm > 0) {
+            bool ok = swarmToken.mint(msg.sender, bonusSwm);
+            require(ok, "SWM mint failed");
+            emit SwmMinted(bonusSwm, msg.sender);
+        }
+
+        emit ClaimedReward(_pollId, msg.sender, reward, bonusSwm);
     }
-    
-    /**
-     * @dev Get poll details
-     * @param _pollId The poll ID
-     */
-    function getPoll(uint256 _pollId) external view returns (
-        string memory question,
-        string[] memory options,
-        uint256 endTime,
-        uint256 totalStaked,
-        bool ended,
-        uint256 winningOption
-    ) {
-        require(_pollId < polls.length, "Invalid poll ID");
+
+    ////////////////////////////////////////////////////////////////
+    //                    SWM MINTING FROM FEES                   //
+    ////////////////////////////////////////////////////////////////
+    function mintSwmFromFees(address to) external onlyOwner {
+        require(block.timestamp >= lastMintTimestamp + 30 days, "Too early");
+        uint256 amountUsdc = totalFeesCollected;
+        require(amountUsdc > 0, "No fees");
+
+        uint256 swmAmount = amountUsdc * 1e12;
+        address recipient = to == address(0) ? treasury : to;
+
+        totalFeesCollected = 0;
+        lastMintTimestamp = block.timestamp;
+
+        bool success = swarmToken.mint(recipient, swmAmount);
+        require(success, "SWM mint failed");
+
+        emit SwmMinted(swmAmount, recipient);
+    }
+
+    ////////////////////////////////////////////////////////////////
+    //                    VIEW FUNCTIONS                          //
+    ////////////////////////////////////////////////////////////////
+    function getPoll(uint256 _pollId)
+        external
+        view
+        returns (
+            string memory question,
+            string[] memory options,
+            uint256 endTime,
+            bool active,
+            uint256 totalStaked,
+            bool winnerDeclared,
+            uint256 winningOptionId
+        )
+    {
+        if (_pollId >= pollCount) revert SwarmPoll__InvalidPollId();
         Poll storage poll = polls[_pollId];
         return (
             poll.question,
             poll.options,
             poll.endTime,
+            poll.active,
             poll.totalStaked,
-            poll.ended,
-            poll.winningOption
+            poll.winnerDeclared,
+            poll.winningOptionId
         );
     }
-    
-    /**
-     * @dev Get option stakes for a poll
-     * @param _pollId The poll ID
-     * @param _optionId The option ID
-     */
-    function getOptionStakes(uint256 _pollId, uint256 _optionId) external view returns (uint256) {
-        require(_pollId < polls.length, "Invalid poll ID");
+
+    function getOptionStake(uint256 _pollId, uint256 _optionId) external view returns (uint256) {
+        if (_pollId >= pollCount) revert SwarmPoll__InvalidPollId();
         Poll storage poll = polls[_pollId];
-        require(_optionId < poll.options.length, "Invalid option");
+        if (_optionId >= poll.options.length) revert SwarmPoll__InvalidOption(_optionId);
         return poll.optionStakes[_optionId];
     }
-    
-    /**
-     * @dev Get user stakes for a specific option
-     * @param _pollId The poll ID
-     * @param _user The user address
-     * @param _optionId The option ID
-     */
-    function getUserStakes(uint256 _pollId, address _user, uint256 _optionId) external view returns (uint256) {
-        require(_pollId < polls.length, "Invalid poll ID");
+
+    function getUserStake(uint256 _pollId, address _user, uint256 _optionId) external view returns (uint256) {
+        if (_pollId >= pollCount) revert SwarmPoll__InvalidPollId();
         Poll storage poll = polls[_pollId];
-        require(_optionId < poll.options.length, "Invalid option");
+        if (_optionId >= poll.options.length) revert SwarmPoll__InvalidOption(_optionId);
         return poll.userStakes[_user][_optionId];
     }
-    
-    /**
-     * @dev Check if user has claimed rewards for a poll
-     * @param _pollId The poll ID
-     * @param _user The user address
-     */
-    function hasClaimed(uint256 _pollId, address _user) external view returns (bool) {
-        require(_pollId < polls.length, "Invalid poll ID");
-        Poll storage poll = polls[_pollId];
-        return poll.hasClaimed[_user];
+
+    function hasUserEntered(uint256 _pollId, address _user) external view returns (bool) {
+        if (_pollId >= pollCount) revert SwarmPoll__InvalidPollId();
+        return polls[_pollId].hasEntered[_user];
     }
-    
-    /**
-     * @dev Get total number of polls
-     */
+
+    function hasUserClaimed(uint256 _pollId, address _user) external view returns (bool) {
+        if (_pollId >= pollCount) revert SwarmPoll__InvalidPollId();
+        return polls[_pollId].claimed[_user];
+    }
+
+    function getOptionCount(uint256 _pollId) external view returns (uint256) {
+        if (_pollId >= pollCount) revert SwarmPoll__InvalidPollId();
+        return polls[_pollId].options.length;
+    }
+
     function getPollCount() external view returns (uint256) {
-        return polls.length;
-    }
-    
-    /**
-     * @dev Calculate potential reward for a user's stake
-     * @param _pollId The poll ID
-     * @param _user The user address
-     */
-    function calculateReward(uint256 _pollId, address _user) external view returns (uint256) {
-        require(_pollId < polls.length, "Invalid poll ID");
-        Poll storage poll = polls[_pollId];
-        require(poll.ended, "Poll not ended");
-        
-        uint256 userStake = poll.userStakes[_user][poll.winningOption];
-        if (userStake == 0) return 0;
-        
-        uint256 totalWinningStakes = poll.optionStakes[poll.winningOption];
-        uint256 totalLosingStakes = poll.totalStaked - totalWinningStakes;
-        return (userStake * totalLosingStakes) / totalWinningStakes + userStake;
+        return pollCount;
     }
 }
-
