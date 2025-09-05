@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.19;
+pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
@@ -11,7 +11,7 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 contract MockUSDC is ERC20, Ownable {
     uint8 private _decimals = 6; // USDC has 6 decimals
     
-    constructor() ERC20("Mock USDC", "mUSDC") {
+    constructor() ERC20("Mock USDC", "mUSDC") Ownable(msg.sender) {
         _mint(msg.sender, 1000000 * 10**6); // Mint 1M USDC
     }
     

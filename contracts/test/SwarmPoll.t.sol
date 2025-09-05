@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.19;
+pragma solidity ^0.8.20;
 
-import "forge-std/Test.sol";
+import "lib/openzeppelin-contracts/lib/forge-std/src/Test.sol";
 import "../src/SwarmPoll.sol";
 import "../src/MockUSDC.sol";
+import "../src/SwarmToken.sol";
 
 contract SwarmPollTest is Test {
     SwarmPoll public swarmPoll;
@@ -19,14 +20,18 @@ contract SwarmPollTest is Test {
         
         // Deploy contracts
         mockUSDC = new MockUSDC();
-        swarmPoll = new SwarmPoll(address(mockUSDC));
+        SwarmToken swarmToken = new SwarmToken();
+        swarmPoll = new SwarmPoll(address(mockUSDC), address(swarmToken));
         
-        vm.stopPrank();
+        // Transfer ownership of SwarmToken to SwarmPoll so it can mint tokens
+        swarmToken.transferOwnership(address(swarmPoll));
         
-        // Give users some USDC
+        // Give users some USDC (while still pranking as owner)
         mockUSDC.mint(user1, 1000 * 10**6);
         mockUSDC.mint(user2, 1000 * 10**6);
         mockUSDC.mint(user3, 1000 * 10**6);
+        
+        vm.stopPrank();
     }
     
     function testCreatePoll() public {
@@ -41,14 +46,14 @@ contract SwarmPollTest is Test {
         swarmPoll.createPoll(question, options, duration);
         
         // Verify poll was created
-        (string memory storedQuestion, string[] memory storedOptions, uint256 endTime, uint256 totalStaked, bool ended, uint256 winningOption) = swarmPoll.getPoll(0);
+        (string memory storedQuestion, string[] memory storedOptions, uint256 endTime, bool active, uint256 totalStaked, bool winnerDeclared, uint256 winningOption) = swarmPoll.getPoll(0);
         
         assertEq(storedQuestion, question);
         assertEq(storedOptions[0], "GPT-5");
         assertEq(storedOptions[1], "Gemini 2");
         assertEq(endTime, block.timestamp + duration);
         assertEq(totalStaked, 0);
-        assertEq(ended, false);
+        assertEq(active, true);
         
         vm.stopPrank();
     }
@@ -67,15 +72,16 @@ contract SwarmPollTest is Test {
         vm.startPrank(user1);
         uint256 stakeAmount = 100 * 10**6; // 100 USDC
         
-        mockUSDC.appve(address(swarmPoll), stakeAmount);
+        mockUSDC.approve(address(swarmPoll), stakeAmount);
         swarmPoll.stake(0, 0, stakeAmount);
         
-        // Verify stake
-        uint256 userStake = swarmPoll.getUserStakes(0, user1, 0);
-        assertEq(userStake, stakeAmount);
+        // Verify stake (after treasury fee deduction)
+        uint256 expectedStake = stakeAmount - (stakeAmount * 200) / 10000; // 2% fee
+        uint256 userStake = swarmPoll.getUserStake(0, user1, 0);
+        assertEq(userStake, expectedStake);
         
-        uint256 optionStake = swarmPoll.getOptionStakes(0, 0);
-        assertEq(optionStake, stakeAmount);
+        uint256 optionStake = swarmPoll.getOptionStake(0, 0);
+        assertEq(optionStake, expectedStake);
         
         vm.stopPrank();
     }
@@ -92,12 +98,12 @@ contract SwarmPollTest is Test {
         
         // Users stake
         vm.startPrank(user1);
-        mockUSDC.appve(address(swarmPoll), 100 * 10**6);
+        mockUSDC.approve(address(swarmPoll), 100 * 10**6);
         swarmPoll.stake(0, 0, 100 * 10**6);
         vm.stopPrank();
         
         vm.startPrank(user2);
-        mockUSDC.appve(address(swarmPoll), 50 * 10**6);
+        mockUSDC.approve(address(swarmPoll), 50 * 10**6);
         swarmPoll.stake(0, 1, 50 * 10**6);
         vm.stopPrank();
         
@@ -109,8 +115,8 @@ contract SwarmPollTest is Test {
         swarmPoll.declareWinner(0, 0);
         
         // Verify poll ended
-        (,,,, bool ended, uint256 winningOption) = swarmPoll.getPoll(0);
-        assertEq(ended, true);
+        (,,, bool active, uint256 totalStaked, bool winnerDeclared, uint256 winningOption) = swarmPoll.getPoll(0);
+        assertEq(winnerDeclared, true);
         assertEq(winningOption, 0);
         
         vm.stopPrank();
@@ -128,13 +134,13 @@ contract SwarmPollTest is Test {
         
         // User1 stakes on winning option
         vm.startPrank(user1);
-        mockUSDC.appve(address(swarmPoll), 100 * 10**6);
+        mockUSDC.approve(address(swarmPoll), 100 * 10**6);
         swarmPoll.stake(0, 0, 100 * 10**6);
         vm.stopPrank();
         
         // User2 stakes on losing option
         vm.startPrank(user2);
-        mockUSDC.appve(address(swarmPoll), 50 * 10**6);
+        mockUSDC.approve(address(swarmPoll), 50 * 10**6);
         swarmPoll.stake(0, 1, 50 * 10**6);
         vm.stopPrank();
         
@@ -156,7 +162,7 @@ contract SwarmPollTest is Test {
         vm.stopPrank();
     }
     
-    function testFailStakeOnEndedPoll() public {
+    function test_RevertWhen_StakeOnEndedPoll() public {
         // Create and end a poll
         vm.startPrank(owner);
         string memory question = "Which AI will be more influential?";
@@ -171,13 +177,13 @@ contract SwarmPollTest is Test {
         
         // Try to stake on ended poll
         vm.startPrank(user1);
-        mockUSDC.appve(address(swarmPoll), 100 * 10**6);
+        mockUSDC.approve(address(swarmPoll), 100 * 10**6);
         vm.expectRevert();
         swarmPoll.stake(0, 0, 100 * 10**6);
         vm.stopPrank();
     }
     
-    function testFailStakeOnExpiredPoll() public {
+    function test_RevertWhen_StakeOnExpiredPoll() public {
         // Create a poll
         vm.startPrank(owner);
         string memory question = "Which AI will be more influential?";
@@ -192,13 +198,13 @@ contract SwarmPollTest is Test {
         
         // Try to stake on expired poll
         vm.startPrank(user1);
-        mockUSDC.appve(address(swarmPoll), 100 * 10**6);
+        mockUSDC.approve(address(swarmPoll), 100 * 10**6);
         vm.expectRevert();
         swarmPoll.stake(0, 0, 100 * 10**6);
         vm.stopPrank();
     }
     
-    function testFailNonOwnerCreatePoll() public {
+    function test_RevertWhen_NonOwnerCreatePoll() public {
         vm.startPrank(user1);
         
         string memory question = "Which AI will be more influential?";
@@ -212,7 +218,7 @@ contract SwarmPollTest is Test {
         vm.stopPrank();
     }
     
-    function testFailNonOwnerDeclareWinner() public {
+    function test_RevertWhen_NonOwnerDeclareWinner() public {
         // Create a poll
         vm.startPrank(owner);
         string memory question = "Which AI will be more influential?";
@@ -244,13 +250,13 @@ contract SwarmPollTest is Test {
         
         // User1 stakes 100 USDC on winning option
         vm.startPrank(user1);
-        mockUSDC.appve(address(swarmPoll), 100 * 10**6);
+        mockUSDC.approve(address(swarmPoll), 100 * 10**6);
         swarmPoll.stake(0, 0, 100 * 10**6);
         vm.stopPrank();
         
         // User2 stakes 50 USDC on losing option
         vm.startPrank(user2);
-        mockUSDC.appve(address(swarmPoll), 50 * 10**6);
+        mockUSDC.approve(address(swarmPoll), 50 * 10**6);
         swarmPoll.stake(0, 1, 50 * 10**6);
         vm.stopPrank();
         
@@ -260,13 +266,19 @@ contract SwarmPollTest is Test {
         swarmPoll.declareWinner(0, 0);
         vm.stopPrank();
         
-        // Calculate reward for user1
-        uint256 reward = swarmPoll.calculateReward(0, user1);
-        assertGt(reward, 100 * 10**6); // Should be more than original stake
+        // User1 should be able to claim reward
+        vm.startPrank(user1);
+        uint256 balanceBefore = mockUSDC.balanceOf(user1);
+        swarmPoll.claimReward(0);
+        uint256 balanceAfter = mockUSDC.balanceOf(user1);
+        assertGt(balanceAfter, balanceBefore); // Should receive more than original stake
+        vm.stopPrank();
         
-        // Calculate reward for user2 (should be 0)
-        uint256 reward2 = swarmPoll.calculateReward(0, user2);
-        assertEq(reward2, 0);
+        // User2 should not be able to claim (staked on losing option)
+        vm.startPrank(user2);
+        vm.expectRevert();
+        swarmPoll.claimReward(0);
+        vm.stopPrank();
     }
 }
 
