@@ -1,11 +1,10 @@
 // Contract configuration
-import type { Address } from "viem"
+import type { Address } from "viem";
 
-export const SWARMPOLL_CONTRACT_ADDRESS: Address =
-  (process.env.NEXT_PUBLIC_CONTRACT_ADDRESS as Address) ??
-  "0x0000000000000000000000000000000000000000"
+export const SWARMPOLL_CONTRACT_ADDRESS: Address = process.env
+  .NEXT_PUBLIC_SWARM_POLL_ADDRESS as Address;
 
-// SwarmPoll contract ABI - simplified for hackathon
+// SwarmPoll contract ABI
 export const SWARMPOLL_ABI = [
   {
     inputs: [
@@ -19,8 +18,9 @@ export const SWARMPOLL_ABI = [
     type: "function",
   },
   {
-    inputs: [{ name: "pollId", type: "uint256" }],
-    name: "claim",
+    // renamed to match your latest logic
+    inputs: [{ name: "_pollId", type: "uint256" }],
+    name: "claimReward",
     outputs: [],
     stateMutability: "nonpayable",
     type: "function",
@@ -66,11 +66,71 @@ export const SWARMPOLL_ABI = [
     stateMutability: "view",
     type: "function",
   },
-] as const
+  {
+    name: "getPoll",
+    inputs: [{ name: "_pollId", type: "uint256", internalType: "uint256" }],
+    outputs: [
+      { name: "question", type: "string", internalType: "string" },
+      { name: "options", type: "string[]", internalType: "string[]" },
+      { name: "endTime", type: "uint256", internalType: "uint256" },
+      { name: "active", type: "bool", internalType: "bool" },
+      { name: "totalStaked", type: "uint256", internalType: "uint256" },
+      { name: "winnerDeclared", type: "bool", internalType: "bool" },
+      {
+        name: "winningOptionId",
+        type: "uint256",
+        internalType: "uint256",
+      },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    type: "function",
+    name: "getPollCount",
+    inputs: [],
+    outputs: [{ name: "", type: "uint256", internalType: "uint256" }],
+    stateMutability: "view",
+  },
+  {
+    // ✅ new: per-option stake amount
+    type: "function",
+    name: "getOptionStake",
+    inputs: [
+      { name: "_pollId", type: "uint256" },
+      { name: "_optionId", type: "uint256" },
+    ],
+    outputs: [{ name: "", type: "uint256" }],
+    stateMutability: "view",
+  },
+  {
+    // ✅ new: user’s stake per poll & option
+    type: "function",
+    name: "getUserStake",
+    inputs: [
+      { name: "_pollId", type: "uint256" },
+      { name: "_user", type: "address" },
+      { name: "_optionId", type: "uint256" },
+    ],
+    outputs: [{ name: "", type: "uint256" }],
+    stateMutability: "view",
+  },
+  {
+    // ✅ new: check if user has already claimed
+    type: "function",
+    name: "hasUserClaimed",
+    inputs: [
+      { name: "_pollId", type: "uint256" },
+      { name: "_user", type: "address" },
+    ],
+    outputs: [{ name: "", type: "bool" }],
+    stateMutability: "view",
+  },
+] as const;
 
 // USDC contract address on Arbitrum Sepolia
-export const USDC_CONTRACT_ADDRESS: Address =
-  "0x0000000000000000000000000000000000000000" // Replace with actual USDC address
+export const USDC_CONTRACT_ADDRESS: Address = process.env
+  .NEXT_PUBLIC_MOCK_USDC_ADDRESS as Address;
 
 export const USDC_ABI = [
   {
@@ -100,4 +160,4 @@ export const USDC_ABI = [
     stateMutability: "view",
     type: "function",
   },
-] as const
+] as const;
