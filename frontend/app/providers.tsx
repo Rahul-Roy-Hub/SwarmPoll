@@ -9,7 +9,7 @@ import { RainbowKitProvider } from "@rainbow-me/rainbowkit"
 import { arbitrum } from "wagmi/chains"
 import { useAccount } from "wagmi"
 import { ApolloProvider } from "@apollo/client/react"
-import { config } from "@/lib/wagmi"
+import { config } from "@/contracts"
 import { client } from "@/lib/subgraph"
 import { useRouter } from "next/navigation"
 

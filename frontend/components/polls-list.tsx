@@ -7,7 +7,7 @@ import {
   useReadContracts,
   useWriteContract,
 } from "wagmi";
-import { SWARMPOLL_CONTRACT_ADDRESS, SWARMPOLL_ABI } from "@/lib/constants";
+import { SWARMPOLL_CONTRACT_ADDRESS, SWARMPOLL_ABI } from "@/contracts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {

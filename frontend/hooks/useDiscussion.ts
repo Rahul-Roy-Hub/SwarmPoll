@@ -1,6 +1,6 @@
 import { useState } from "react"
 import { useAccount, useReadContract } from "wagmi"
-import { SWARMPOLL_CONTRACT_ADDRESS, SWARMPOLL_ABI } from "@/lib/constants"
+import { SWARMPOLL_CONTRACT_ADDRESS, SWARMPOLL_ABI } from "@/contracts"
 import { useToast } from "@/hooks/use-toast"
 
 export function useDiscussion() {

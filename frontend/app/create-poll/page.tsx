@@ -10,7 +10,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Skeleton } from "@/components/ui/skeleton"
 import { ConnectButton } from "@rainbow-me/rainbowkit"
 import { Shield, Crown, Wallet, AlertTriangle } from "lucide-react"
-import { SWARMPOLL_CONTRACT_ADDRESS, SWARMPOLL_ABI, ADMIN_ADDRESS } from "@/lib/constants"
+import { SWARMPOLL_CONTRACT_ADDRESS, SWARMPOLL_ABI, ADMIN_ADDRESS } from "@/contracts"
 
 type ActivePollsData = { polls: any[] }
 

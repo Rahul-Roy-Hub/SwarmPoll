@@ -8,7 +8,7 @@ import Image from "next/image"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { useAccount, useReadContract } from "wagmi"
-import { SWARMPOLL_CONTRACT_ADDRESS, SWARMPOLL_ABI, ADMIN_ADDRESS } from "@/lib/constants"
+import { SWARMPOLL_CONTRACT_ADDRESS, SWARMPOLL_ABI, ADMIN_ADDRESS } from "@/contracts"
 import { useState, useEffect } from "react"
 
 export default function HomePage() {

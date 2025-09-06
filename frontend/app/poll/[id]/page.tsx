@@ -1,6 +1,6 @@
 "use client"
 
-import { useQuery } from "@apollo/client"
+import { useQuery } from "@apollo/client/react"
 import { useAccount } from "wagmi"
 import { GET_POLL_BY_ID } from "@/lib/subgraph"
 import { StakeOption } from "@/components/stake-option"

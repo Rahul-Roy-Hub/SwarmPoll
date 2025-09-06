@@ -7,7 +7,7 @@ import {
   useReadContracts,
   useWriteContract,
 } from "wagmi";
-import { SWARMPOLL_CONTRACT_ADDRESS, SWARMPOLL_ABI } from "@/lib/constants";
+import { SWARMPOLL_CONTRACT_ADDRESS, SWARMPOLL_ABI } from "@/contracts";
 import { ClaimableReward } from "@/components/claimable-reward";
 import { StakeHistoryItem } from "@/components/stake-history-item";
 import { UserStats } from "@/components/user-stats";

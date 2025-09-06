@@ -8,6 +8,7 @@ import { Providers } from "./providers"
 import { Navbar } from "@/components/navbar"
 
 export const metadata: Metadata = {
+  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'),
   title: "SwarmPoll - Social Prediction Game",
   description: "Predict what others will choose and win rewards from the collective wisdom",
   generator: "v0.app",

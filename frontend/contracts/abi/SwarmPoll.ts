@@ -1,14 +1,4 @@
-// Contract configuration
-import type { Address } from "viem";
-
-export const SWARMPOLL_CONTRACT_ADDRESS: Address = process.env
-  .NEXT_PUBLIC_SWARM_POLL_ADDRESS as Address;
-
-// Optional admin override address for UI gating
-export const ADMIN_ADDRESS: string =
-  (process.env.NEXT_PUBLIC_ADMIN_ADDRESS as string) || ""
-
-// SwarmPoll contract ABI - simplified for hackathon
+// SwarmPoll contract ABI
 export const SWARMPOLL_ABI = [
   {
     inputs: [
@@ -108,7 +98,7 @@ export const SWARMPOLL_ABI = [
     stateMutability: "view",
   },
   {
-    // ✅ new: user’s stake per poll & option
+    // ✅ new: user's stake per poll & option
     type: "function",
     name: "getUserStake",
     inputs: [
@@ -129,39 +119,5 @@ export const SWARMPOLL_ABI = [
     ],
     outputs: [{ name: "", type: "bool" }],
     stateMutability: "view",
-  },
-] as const;
-
-// USDC contract address on Arbitrum Sepolia
-export const USDC_CONTRACT_ADDRESS: Address = process.env
-  .NEXT_PUBLIC_MOCK_USDC_ADDRESS as Address;
-
-export const USDC_ABI = [
-  {
-    inputs: [
-      { name: "spender", type: "address" },
-      { name: "amount", type: "uint256" },
-    ],
-    name: "approve",
-    outputs: [{ name: "", type: "bool" }],
-    stateMutability: "nonpayable",
-    type: "function",
-  },
-  {
-    inputs: [
-      { name: "owner", type: "address" },
-      { name: "spender", type: "address" },
-    ],
-    name: "allowance",
-    outputs: [{ name: "", type: "uint256" }],
-    stateMutability: "view",
-    type: "function",
-  },
-  {
-    inputs: [{ name: "account", type: "address" }],
-    name: "balanceOf",
-    outputs: [{ name: "", type: "uint256" }],
-    stateMutability: "view",
-    type: "function",
   },
 ] as const;

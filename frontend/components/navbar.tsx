@@ -6,7 +6,7 @@ import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { Users, Plus, User, Crown, MessageSquare, Menu, X } from "lucide-react"
 import { useAccount, useReadContract } from "wagmi"
-import { SWARMPOLL_CONTRACT_ADDRESS, SWARMPOLL_ABI } from "@/lib/constants"
+import { SWARMPOLL_CONTRACT_ADDRESS, SWARMPOLL_ABI } from "@/contracts"
 import { useState } from "react"
 
 export function Navbar() {

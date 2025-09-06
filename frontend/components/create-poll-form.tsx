@@ -11,7 +11,7 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
 import { Loader2, Plus, X, Calendar, HelpCircle, MessageSquare, Info, Users, Target, Crown } from "lucide-react"
-import { SWARMPOLL_CONTRACT_ADDRESS, SWARMPOLL_ABI } from "@/lib/constants"
+import { SWARMPOLL_CONTRACT_ADDRESS, SWARMPOLL_ABI } from "@/contracts"
 import { useToast } from "@/hooks/use-toast"
 
 export function CreatePollForm() {
