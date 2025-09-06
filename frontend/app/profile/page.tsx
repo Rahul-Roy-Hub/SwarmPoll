@@ -14,7 +14,6 @@ import { Label } from "@/components/ui/label"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Skeleton } from "@/components/ui/skeleton"
-import { ConnectButton } from "@rainbow-me/rainbowkit"
 import { Wallet, Trophy, History, TrendingUp, AlertCircle } from "lucide-react"
 import { useEffect, useMemo, useState } from "react"
 
@@ -170,7 +169,6 @@ export default function ProfilePage() {
             <p className="text-muted-foreground mb-6">
               View your stake history, claimable rewards, and performance statistics
             </p>
-            <ConnectButton />
           </CardContent>
         </Card>
       </div>

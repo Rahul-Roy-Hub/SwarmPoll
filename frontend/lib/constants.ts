@@ -5,6 +5,10 @@ export const SWARMPOLL_CONTRACT_ADDRESS: Address =
   (process.env.NEXT_PUBLIC_CONTRACT_ADDRESS as Address) ??
   "0x0000000000000000000000000000000000000000"
 
+// Optional admin override address for UI gating
+export const ADMIN_ADDRESS: string =
+  (process.env.NEXT_PUBLIC_ADMIN_ADDRESS as string) || ""
+
 // SwarmPoll contract ABI - simplified for hackathon
 export const SWARMPOLL_ABI = [
   {

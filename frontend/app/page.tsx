@@ -8,12 +8,13 @@ import Image from "next/image"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { useAccount, useReadContract } from "wagmi"
-import { SWARMPOLL_CONTRACT_ADDRESS, SWARMPOLL_ABI } from "@/lib/constants"
+import { SWARMPOLL_CONTRACT_ADDRESS, SWARMPOLL_ABI, ADMIN_ADDRESS } from "@/lib/constants"
 import { useState, useEffect } from "react"
 
 export default function HomePage() {
   const { address, isConnected } = useAccount()
   const [mounted, setMounted] = useState(false)
+  const uiAdmin = ADMIN_ADDRESS?.toLowerCase?.() || ""
   
   // Check if connected user is the contract owner
   const { data: ownerAddress } = useReadContract({
@@ -22,7 +23,11 @@ export default function HomePage() {
     functionName: "owner",
   })
 
-  const isOwner = address && ownerAddress && address.toLowerCase() === ownerAddress.toLowerCase()
+  const isOwner =
+    !!address && (
+      (ownerAddress && address.toLowerCase() === (ownerAddress as string).toLowerCase()) ||
+      (uiAdmin && address.toLowerCase() === uiAdmin)
+    )
 
   useEffect(() => {
     setMounted(true)
@@ -57,9 +62,8 @@ export default function HomePage() {
           {/* Main heading */}
           <div className="space-y-8">
             <h1 className="text-6xl md:text-7xl lg:text-8xl font-bold leading-tight">
-              <span className="bg-gradient-to-r from-primary via-primary/80 to-primary/60 bg-clip-text text-transparent">
-                SwarmPoll
-              </span>
+              <span className="bg-gradient-to-r from-blue-600 to-blue-500 bg-clip-text text-transparent">Swarm</span>
+              <span className="ml-2 bg-gradient-to-r from-amber-500 to-amber-400 bg-clip-text text-transparent">Poll</span>
               <div className="flex items-center justify-center gap-6 mt-4">
                 <Image 
                   src="/swarmpoll-logo.png" 
@@ -113,7 +117,7 @@ export default function HomePage() {
               <Link href="/suggest">
                 <Button variant="outline" size="lg" className="gap-3 px-10 py-8 text-xl font-bold border-2 border-blue-500/50 hover:bg-blue-500/10 transition-all duration-300 hover:scale-105 text-blue-600 hover:text-blue-700">
                   <MessageSquare className="w-6 h-6" />
-                  Suggest New Poll
+                  Suggest a Poll
                   <ArrowRight className="w-5 h-5" />
                 </Button>
               </Link>
