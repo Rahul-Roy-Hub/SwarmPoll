@@ -1,17 +1,49 @@
 import { useState } from "react";
-import { useAccount, useReadContract, useWriteContract, useSendTransaction } from "wagmi";
+import { useAccount, useReadContract, useWriteContract, useSendTransaction, useChainId } from "wagmi";
 import { parseUnits, formatUnits, encodeFunctionData } from "viem";
 import { SWARMPOLL_CONTRACT_ADDRESS, SWARMPOLL_ABI, USDC_CONTRACT_ADDRESS, USDC_ABI } from "@/contracts";
 import { useToast } from "@/hooks/use-toast";
+import { getGasConfig, GAS_PRICE } from "@/lib/gas-config";
 
 export function useStaking(pollId: string, optionId: string) {
   const { address, isConnected } = useAccount();
   const { writeContract } = useWriteContract();
   const { sendTransaction } = useSendTransaction();
   const { toast } = useToast();
+  const chainId = useChainId();
   
   const [isApproving, setIsApproving] = useState(false);
   const [isStaking, setIsStaking] = useState(false);
+
+  // Get appropriate gas configuration based on network
+  const getGasConfigForNetwork = (operation: 'USDC_APPROVE' | 'SWARMPOLL_STAKE') => {
+    const config = getGasConfig(operation);
+    
+    console.log(`Current chain ID: ${chainId}`);
+    console.log(`Operation: ${operation}`);
+    
+    // For Arbitrum Sepolia (421614), use very low gas prices
+    if (chainId === 421614) {
+      console.log('Using Arbitrum Sepolia gas config (1 gwei)');
+      return {
+        gas: config.gas,
+        gasPrice: GAS_PRICE.SLOW, // 1 gwei for testnet
+      };
+    }
+    
+    // For Arbitrum mainnet (42161), use higher gas prices
+    if (chainId === 42161) {
+      console.log('Using Arbitrum mainnet gas config (2 gwei)');
+      return {
+        gas: config.gas,
+        gasPrice: GAS_PRICE.STANDARD, // 2 gwei for mainnet
+      };
+    }
+    
+    // For other networks, use standard configuration
+    console.log(`Using default gas config for chain ${chainId}`);
+    return config;
+  };
 
   // Get USDC balance
   const { data: usdcBalance, refetch: refetchBalance } = useReadContract({
@@ -66,6 +98,23 @@ export function useStaking(pollId: string, optionId: string) {
     return amountBigInt <= usdcBalance;
   };
 
+  // Check if we're on a supported network
+  const isSupportedNetwork = () => {
+    return chainId === 421614 || chainId === 42161; // Arbitrum Sepolia or Arbitrum
+  };
+
+  // Get network name for display
+  const getNetworkName = () => {
+    switch (chainId) {
+      case 421614:
+        return "Arbitrum Sepolia";
+      case 42161:
+        return "Arbitrum";
+      default:
+        return `Chain ${chainId}`;
+    }
+  };
+
   const approve = async (amount: string) => {
     if (!isConnected || !address) {
       toast({
@@ -79,6 +128,7 @@ export function useStaking(pollId: string, optionId: string) {
     setIsApproving(true);
     try {
       const amountBigInt = parseUSDC(amount);
+      const gasConfig = getGasConfigForNetwork('USDC_APPROVE');
       
       // Use sendTransaction with encoded data for better gas control
       const data = encodeFunctionData({
@@ -90,8 +140,8 @@ export function useStaking(pollId: string, optionId: string) {
       await sendTransaction({
         to: USDC_CONTRACT_ADDRESS,
         data,
-        gas: 100000n,
-        gasPrice: 1000000000n, // 1 gwei
+        gas: gasConfig.gas,
+        gasPrice: gasConfig.gasPrice,
       });
       
       toast({
@@ -128,6 +178,7 @@ export function useStaking(pollId: string, optionId: string) {
     setIsStaking(true);
     try {
       const amountBigInt = parseUSDC(amount);
+      const gasConfig = getGasConfigForNetwork('SWARMPOLL_STAKE');
       
       // Use sendTransaction with encoded data for better gas control
       const data = encodeFunctionData({
@@ -139,8 +190,8 @@ export function useStaking(pollId: string, optionId: string) {
       await sendTransaction({
         to: SWARMPOLL_CONTRACT_ADDRESS,
         data,
-        gas: 200000n,
-        gasPrice: 1000000000n, // 1 gwei
+        gas: gasConfig.gas,
+        gasPrice: gasConfig.gasPrice,
       });
       
       toast({
@@ -211,6 +262,11 @@ export function useStaking(pollId: string, optionId: string) {
     allowance: formatUSDC(allowance),
     userStake: formatUSDC(userStake),
     optionStake: formatUSDC(optionStake),
+    
+    // Network info
+    chainId,
+    networkName: getNetworkName(),
+    isSupportedNetwork: isSupportedNetwork(),
     
     // Computed values
     needsApproval: checkNeedsApproval,

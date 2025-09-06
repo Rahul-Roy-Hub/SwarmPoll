@@ -6,6 +6,7 @@ import {
   useReadContract,
   useReadContracts,
   useWriteContract,
+  useChainId,
 } from "wagmi";
 import { SWARMPOLL_CONTRACT_ADDRESS, SWARMPOLL_ABI } from "@/contracts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -20,7 +21,8 @@ import {
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Loader2, Clock, Coins, Award, CheckCircle } from "lucide-react";
-import { parseEther } from "viem";
+import { parseUnits } from "viem";
+import { getGasConfig } from "@/lib/gas-config";
 
 type RawPoll = readonly [
   string,
@@ -69,6 +71,37 @@ function Countdown({ endTime }: { endTime: number }) {
 export function PollsList() {
   const { address } = useAccount();
   const { writeContractAsync } = useWriteContract();
+  const chainId = useChainId();
+
+  // Get appropriate gas configuration based on network
+  const getGasConfigForNetwork = (operation: 'SWARMPOLL_STAKE' | 'SWARMPOLL_CLAIM_REWARD') => {
+    const config = getGasConfig(operation);
+    
+    console.log(`Current chain ID: ${chainId}`);
+    console.log(`Operation: ${operation}`);
+    
+    // For Arbitrum Sepolia (421614), use very low gas prices
+    if (chainId === 421614) {
+      console.log('Using Arbitrum Sepolia gas config (1 gwei)');
+      return {
+        gas: config.gas,
+        gasPrice: BigInt(1000000000), // 1 gwei for testnet
+      };
+    }
+    
+    // For Arbitrum mainnet (42161), use higher gas prices
+    if (chainId === 42161) {
+      console.log('Using Arbitrum mainnet gas config (2 gwei)');
+      return {
+        gas: config.gas,
+        gasPrice: BigInt(2000000000), // 2 gwei for mainnet
+      };
+    }
+    
+    // For other networks, use standard configuration
+    console.log(`Using default gas config for chain ${chainId}`);
+    return config;
+  };
 
   // Poll count
   const { data: pollCount } = useReadContract({
@@ -154,14 +187,37 @@ export function PollsList() {
   // Stake handler
   const handleStake = async () => {
     if (!selectedPoll || selectedOption === null || !stakeAmount) return;
+    
+    // Validate amount
+    const amountNum = parseFloat(stakeAmount);
+    if (isNaN(amountNum) || amountNum <= 0) {
+      console.error("Invalid amount:", stakeAmount);
+      return;
+    }
+    
+    // Prevent extremely large amounts (safety check)
+    if (amountNum > 1000000) { // 1 million USDC max
+      console.error("Amount too large:", stakeAmount);
+      return;
+    }
+    
     try {
       setLoading(true);
-      const amount = parseEther(stakeAmount); // ✅ handles 0.001
+      const amount = parseUnits(stakeAmount, 6); // USDC has 6 decimals
+      const gasConfig = getGasConfigForNetwork('SWARMPOLL_STAKE');
+      
+      console.log('Staking amount:', stakeAmount, 'USDC');
+      console.log('Parsed amount:', amount.toString());
+      
+      console.log('Staking with gas config:', gasConfig);
+      
       await writeContractAsync({
         address: SWARMPOLL_CONTRACT_ADDRESS,
         abi: SWARMPOLL_ABI,
         functionName: "stake",
         args: [BigInt(selectedPoll.id), BigInt(selectedOption), amount],
+        gas: gasConfig.gas,
+        gasPrice: gasConfig.gasPrice,
       });
       setOpen(false);
       setStakeAmount("");
@@ -176,11 +232,17 @@ export function PollsList() {
   const handleClaim = async (pollId: number) => {
     try {
       setLoading(true);
+      const gasConfig = getGasConfigForNetwork('SWARMPOLL_CLAIM_REWARD');
+      
+      console.log('Claiming with gas config:', gasConfig);
+      
       await writeContractAsync({
         address: SWARMPOLL_CONTRACT_ADDRESS,
         abi: SWARMPOLL_ABI,
         functionName: "claimReward",
         args: [BigInt(pollId)],
+        gas: gasConfig.gas,
+        gasPrice: gasConfig.gasPrice,
       });
     } catch (err) {
       console.error("Claim error:", err);
@@ -190,11 +252,12 @@ export function PollsList() {
   };
 
   return (
-    <Tabs defaultValue="active" className="space-y-4">
-      <TabsList>
-        <TabsTrigger value="active">Active Polls</TabsTrigger>
-        <TabsTrigger value="ended">Ended Polls</TabsTrigger>
-      </TabsList>
+    <div className="space-y-4">
+      <Tabs defaultValue="active" className="space-y-4">
+        <TabsList>
+          <TabsTrigger value="active">Active Polls</TabsTrigger>
+          <TabsTrigger value="ended">Ended Polls</TabsTrigger>
+        </TabsList>
 
       {/* Active Polls */}
       <TabsContent value="active">
@@ -334,7 +397,7 @@ export function PollsList() {
                 </Button>
               ))}
               <Input
-                placeholder="Enter amount (ETH)"
+                placeholder="Enter amount (USDC)"
                 value={stakeAmount}
                 onChange={(e) => setStakeAmount(e.target.value)}
               />
@@ -347,6 +410,7 @@ export function PollsList() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </Tabs>
+      </Tabs>
+    </div>
   );
 }
