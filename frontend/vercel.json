@@ -1,0 +1,14 @@
+{
+  "buildCommand": "yarn build",
+  "outputDirectory": ".next",
+  "framework": "nextjs",
+  "installCommand": "yarn install",
+  "devCommand": "yarn dev",
+  "env": {
+    "NEXT_PUBLIC_WALLET_CONNECT_PROJECT_ID": "@walletconnect-project-id",
+    "NEXT_PUBLIC_SWARM_POLL_ADDRESS": "@swarm-poll-address",
+    "NEXT_PUBLIC_MOCK_USDC_ADDRESS": "@mock-usdc-address", 
+    "NEXT_PUBLIC_SWARM_TOKEN_ADDRESS": "@swarm-token-address",
+    "NEXT_PUBLIC_ADMIN_ADDRESS": "@admin-address"
+  }
+}
