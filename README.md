@@ -161,10 +161,6 @@ Currently not configured. You can add Jest/RTL tests under `frontend/`.
 1. Build the application: `yarn build`
 2. Deploy to Vercel, Netlify, or your preferred platform
 
-## 📚 Documentation
-
-- [Architecture Overview](docs/ARCHITECTURE.md)
-- [Demo Guide](docs/DEMO.md)
 
 ## 🤝 Contributing
 
