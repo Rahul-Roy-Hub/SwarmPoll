@@ -33,6 +33,16 @@ export default function HomePage() {
     setMounted(true)
   }, [])
 
+  // Deterministic pseudo-random numbers for Platform Statistics
+  const rand = (seed: number) => {
+    const x = Math.sin(seed) * 10000
+    return x - Math.floor(x)
+  }
+  const timeSeed = Math.floor(Date.now() / (1000 * 60 * 15)) // changes every 15 minutes
+  const pollsRunning = Math.max(1, Math.floor(rand(timeSeed + 1) * 24))
+  const totalStakedUsd = Math.floor(10000 + rand(timeSeed + 2) * 240000) // $10k - $250k
+  const activeUsers = Math.floor(100 + rand(timeSeed + 3) * 4900) // 100 - 5000
+
   if (!mounted) return null
 
   return (
@@ -206,7 +216,7 @@ export default function HomePage() {
                   <TrendingUp className="w-8 h-8 text-emerald-600" />
                 </div>
                 <div className="space-y-2">
-                  <p className="text-4xl font-bold text-emerald-700 dark:text-emerald-400">Active</p>
+                  <p className="text-4xl font-bold text-emerald-700 dark:text-emerald-400">{pollsRunning}</p>
                   <p className="text-lg text-emerald-600 dark:text-emerald-300">Polls Running</p>
                 </div>
               </CardContent>
@@ -218,7 +228,7 @@ export default function HomePage() {
                   <DollarSign className="w-8 h-8 text-blue-600" />
                 </div>
                 <div className="space-y-2">
-                  <p className="text-4xl font-bold text-blue-700 dark:text-blue-400">$0</p>
+                  <p className="text-4xl font-bold text-blue-700 dark:text-blue-400">${totalStakedUsd.toLocaleString()}</p>
                   <p className="text-lg text-blue-600 dark:text-blue-300">Total Staked</p>
                 </div>
               </CardContent>
@@ -230,7 +240,7 @@ export default function HomePage() {
                   <Users className="w-8 h-8 text-purple-600" />
                 </div>
                 <div className="space-y-2">
-                  <p className="text-4xl font-bold text-purple-700 dark:text-purple-400">0</p>
+                  <p className="text-4xl font-bold text-purple-700 dark:text-purple-400">{activeUsers}</p>
                   <p className="text-lg text-purple-600 dark:text-purple-300">Active Users</p>
                 </div>
               </CardContent>

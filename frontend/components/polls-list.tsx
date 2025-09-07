@@ -263,7 +263,10 @@ export function PollsList() {
       <TabsContent value="active">
         <div className="grid gap-4">
           {polls
-            .filter((p) => p.active)
+            .filter((p) => {
+              const nowSec = Math.floor(Date.now() / 1000);
+              return p.active && p.endTime > nowSec;
+            })
             .map((poll) => (
               <Card key={poll.id} className="shadow-md">
                 <CardHeader>
@@ -313,12 +316,18 @@ export function PollsList() {
       <TabsContent value="ended">
         <div className="grid gap-4">
           {polls
-            .filter((p) => !p.active)
+            .filter((p) => {
+              const nowSec = Math.floor(Date.now() / 1000);
+              return !p.active || p.endTime <= nowSec;
+            })
             .map((poll) => (
               <Card key={poll.id} className="shadow-md">
                 <CardHeader>
-                  <CardTitle>
-                    #{poll.id} – {poll.question}
+                  <CardTitle className="flex items-center justify-between">
+                    <span>
+                      #{poll.id} – {poll.question}
+                    </span>
+                    <span className="text-sm font-medium text-red-500">Ended</span>
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-3">

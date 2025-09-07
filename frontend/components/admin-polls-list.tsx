@@ -45,12 +45,12 @@ export function AdminPollsList({ polls }: AdminPollsListProps) {
   }
 
   const endedPolls = polls.filter((poll) => {
-    const endTime = Number.parseInt(poll.endTime) * 1000
+    const endTime = Number.parseInt(String(poll.endTime)) * 1000
     return Date.now() > endTime && !poll.isEnded
   })
 
   const activePolls = polls.filter((poll) => {
-    const endTime = Number.parseInt(poll.endTime) * 1000
+    const endTime = Number.parseInt(String(poll.endTime)) * 1000
     return Date.now() <= endTime
   })
 

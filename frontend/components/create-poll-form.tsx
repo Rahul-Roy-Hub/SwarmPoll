@@ -85,7 +85,18 @@ export function CreatePollForm() {
       return
     }
 
+    // Contract expects a duration (in seconds), not an absolute timestamp
+    const nowUnix = Math.floor(Date.now() / 1000)
     const endTimeUnix = Math.floor(endDateTime.getTime() / 1000)
+    const durationSeconds = endTimeUnix - nowUnix
+    if (durationSeconds <= 0) {
+      toast({
+        title: "Invalid duration",
+        description: "End time must be after the current time",
+        variant: "destructive",
+      })
+      return
+    }
 
     setIsCreating(true)
     try {
@@ -93,7 +104,7 @@ export function CreatePollForm() {
         address: SWARMPOLL_CONTRACT_ADDRESS,
         abi: SWARMPOLL_ABI,
         functionName: "createPoll",
-        args: [question.trim(), validOptions, BigInt(endTimeUnix)],
+        args: [question.trim(), validOptions, BigInt(durationSeconds)],
       })
 
       toast({

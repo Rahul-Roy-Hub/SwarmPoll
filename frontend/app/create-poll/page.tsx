@@ -1,6 +1,6 @@
 "use client"
 
-import { useAccount, useReadContract } from "wagmi"
+import { useAccount, useReadContract, useReadContracts } from "wagmi"
 import { useQuery } from "@apollo/client/react"
 import { GET_ACTIVE_POLLS } from "@/lib/subgraph"
 import { CreatePollForm } from "@/components/create-poll-form"
@@ -35,6 +35,41 @@ export default function CreatePollPage() {
         address.toLowerCase() !== (ownerAddress as string)?.toLowerCase() &&
         (!uiAdmin || address.toLowerCase() !== uiAdmin)),
   })
+
+  // On-chain fallback if subgraph is not configured or returns empty
+  const { data: pollCount } = useReadContract({
+    address: SWARMPOLL_CONTRACT_ADDRESS,
+    abi: SWARMPOLL_ABI,
+    functionName: "getPollCount",
+  })
+
+  const pollQueries =
+    pollCount && Number(pollCount) > 0
+      ? Array.from({ length: Number(pollCount) }, (_, i) => ({
+          address: SWARMPOLL_CONTRACT_ADDRESS,
+          abi: SWARMPOLL_ABI,
+          functionName: "getPoll",
+          args: [BigInt(i)],
+        }))
+      : []
+
+  const { data: pollsOnChain } = useReadContracts({ contracts: pollQueries })
+
+  const fallbackPolls = (pollsOnChain || [])
+    .map((res, i) => {
+      if (res?.status !== "success" || !res.result) return null
+      const [question, options, endTime, active, totalStaked, winnerDeclared, winningOptionId] = res.result as any
+      return {
+        id: String(i),
+        question,
+        endTime: String(Number(endTime)),
+        totalStaked: String(Number(totalStaked)),
+        isEnded: !active,
+        winningOption: winnerDeclared ? String(Number(winningOptionId)) : null,
+        options: (options as string[]).map((label, idx) => ({ id: String(idx), label, totalStaked: "0" })),
+      }
+    })
+    .filter(Boolean) as any[]
 
   const isOwner =
     !!address && (
@@ -136,7 +171,7 @@ export default function CreatePollPage() {
             ))}
           </div>
         ) : (
-          <AdminPollsList polls={pollsData?.polls || []} />
+          <AdminPollsList polls={(pollsData?.polls && pollsData.polls.length > 0) ? pollsData.polls : fallbackPolls} />
         )}
       </div>
     </div>
